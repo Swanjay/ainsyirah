@@ -52,12 +52,10 @@ const PERSONAS: Record<string, string> = {
 // Map model frontend → Groq model name
 function toGroqModel(modelKey: string): string {
   const map: Record<string, string> = {
-    "kr/deepseek-3.2": "llama-3.1-8b-instant",
-    "kr/claude-sonnet-4.5": "llama-3.3-70b-versatile",
-    "kr/claude-haiku-4.5": "llama-3.1-8b-instant",
-    "kr/claude-sonnet-4": "llama-3.3-70b-versatile",
-    "kr/minimax-m2.5": "mixtral-8x7b-32768",
-    "kr/glm-5": "gemma2-9b-it",
+    "groq/llama-3.1-8b": "llama-3.1-8b-instant",
+    "groq/llama-3.3-70b": "llama-3.3-70b-versatile",
+    "groq/mixtral-8x7b": "mixtral-8x7b-32768",
+    "groq/gemma2-9b": "gemma2-9b-it",
   };
   return map[modelKey] ?? "llama-3.1-8b-instant";
 }

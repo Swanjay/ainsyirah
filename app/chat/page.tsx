@@ -8,12 +8,10 @@ import VoiceInput from "../components/VoiceInput";
 type Message = { role: "user" | "assistant"; content: string };
 
 const MODELS = [
-  { key: "kr/deepseek-3.2", label: "🔮 DeepSeek 3.2 (cepat & ringan)", default: true },
-  { key: "kr/claude-sonnet-4.5", label: "🧠 Claude Sonnet 4.5 (terbaik)" },
-  { key: "kr/claude-haiku-4.5", label: "⚡ Claude Haiku 4.5 (paling ringan)" },
-  { key: "kr/claude-sonnet-4", label: "💬 Claude Sonnet 4" },
-  { key: "kr/minimax-m2.5", label: "✨ MiniMax M2.5" },
-  { key: "kr/glm-5", label: "🌟 GLM-5" },
+  { key: "groq/llama-3.1-8b", label: "⚡ Llama 3.1 8B — Cepat & Ringan", default: true },
+  { key: "groq/llama-3.3-70b", label: "🧠 Llama 3.3 70B — Terbaik & Pintar" },
+  { key: "groq/mixtral-8x7b", label: "🔮 Mixtral 8x7B — Seimbang" },
+  { key: "groq/gemma2-9b", label: "✨ Gemma 2 9B — Google AI" },
 ];
 
 const GREETING: Message = {
