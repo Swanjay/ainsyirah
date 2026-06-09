@@ -1,7 +1,7 @@
 // Backend A'insyirah — menghubungkan chat ke API AI.
-// Provider 1: Pollinations (free, tanpa key, anonymous tier)
-// Provider 2: Alpakyros (backup, butuh API key)
-// Model verified: openai-fast (GPT-OSS 20B) via Pollinations
+// Provider 1: Groq (primary, fast, free tier)
+// Provider 2: Pollinations (backup, free, no key)
+// Provider 3: Alpakyros (backup, needs key)
 
 export const runtime = "nodejs";
 
@@ -10,19 +10,26 @@ type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 import { readFileSync } from "fs";
 import { join } from "path";
 
-// API key Alpakyros: prioritas ENV variable (Vercel), fallback ke file .key.b64 (lokal)
+// API keys: prioritas ENV variable (Vercel), fallback ke file lokal
+let _groqKey = process.env.GROQ_API_KEY ?? "";
 let _alpakyrosKey = process.env.ALPAYKROS_KEY ?? "";
-if (!_alpakyrosKey) {
+
+if (!_groqKey || !_alpakyrosKey) {
   try {
-    const _keyPath = join(process.cwd(), ".key.b64");
-    _alpakyrosKey = Buffer.from(readFileSync(_keyPath, "utf-8").trim(), "base64").toString();
+    const envContent = readFileSync(join(process.cwd(), ".env.local"), "utf-8");
+    for (const line of envContent.split("\n")) {
+      const [k, ...v] = line.split("=");
+      const val = v.join("=").trim();
+      if (k?.trim() === "GROQ_API_KEY" && !_groqKey) _groqKey = val;
+      if (k?.trim() === "ALPAYKROS_KEY" && !_alpakyrosKey) _alpakyrosKey = val;
+    }
   } catch {}
 }
 
 // Daftar "kepribadian" asisten
 const PERSONAS: Record<string, string> = {
   umum:
-    "Kamu adalah A'insyirah, asisten AI ramah berbahasa Indonesia (seperti ChatGPT). " +
+    "Kamu adalah A'insyirah, asisten AI ramah berbahasa Indonesia. " +
     "Kamu membantu menjawab pertanyaan umum, menulis, menerjemahkan, menjelaskan " +
     "pelajaran, dan memberi ide. Jawab dengan jelas, sopan, dan mudah dipahami. " +
     "Gunakan bahasa sehari-hari. Sesekali boleh memberi semangat yang positif.",
@@ -42,88 +49,104 @@ const PERSONAS: Record<string, string> = {
     "dan sarankan merujuk pada ustadz/sumber terpercaya. Tetap ramah dan memberi semangat.",
 };
 
-// Map model frontend → model Pollinations
-function toPollinationsModel(modelKey: string): string {
+// Map model frontend → Groq model name
+function toGroqModel(modelKey: string): string {
   const map: Record<string, string> = {
-    "kr/deepseek-3.2": "openai",
-    "kr/claude-sonnet-4.5": "openai",
-    "kr/claude-haiku-4.5": "openai",
-    "kr/claude-sonnet-4": "openai",
-    "kr/minimax-m2.5": "openai",
-    "kr/glm-5": "openai",
+    "kr/deepseek-3.2": "llama-3.1-8b-instant",
+    "kr/claude-sonnet-4.5": "llama-3.3-70b-versatile",
+    "kr/claude-haiku-4.5": "llama-3.1-8b-instant",
+    "kr/claude-sonnet-4": "llama-3.3-70b-versatile",
+    "kr/minimax-m2.5": "mixtral-8x7b-32768",
+    "kr/glm-5": "gemma2-9b-it",
   };
-  return map[modelKey] ?? "openai";
+  return map[modelKey] ?? "llama-3.1-8b-instant";
 }
 
-// Map model frontend → model Alpakyros
-function toAlpakyrosModel(modelKey: string): string {
-  // Alpakyros menggunakan nama asli
-  return modelKey;
-}
-
-// === PROVIDER 1: Pollinations (primary, free, tanpa key) ===
-// Endpoint: https://text.pollinations.ai/ (non-legacy, JSON response)
-async function askPollinations(
+// === PROVIDER 1: Groq (primary) ===
+async function askGroq(
   messages: ChatMessage[],
   systemPrompt: ChatMessage,
   modelKey: string,
 ): Promise<string | null> {
-  const pollModel = toPollinationsModel(modelKey);
+  if (!_groqKey) return null;
+  const model = toGroqModel(modelKey);
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${_groqKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [systemPrompt, ...messages],
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const reply = data?.choices?.[0]?.message?.content;
+      if (reply) {
+        console.log(`OK via Groq/${model}`);
+        return reply;
+      }
+    } else {
+      const errText = await res.text().catch(() => "");
+      console.error(`Groq error: ${res.status} ${errText.slice(0, 150)}`);
+    }
+  } catch (err) {
+    console.error(`Groq failed:`, err);
+  }
+  return null;
+}
+
+// === PROVIDER 2: Pollinations (backup, free, no key) ===
+async function askPollinations(
+  messages: ChatMessage[],
+  systemPrompt: ChatMessage,
+): Promise<string | null> {
   try {
     const res = await fetch("https://text.pollinations.ai/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: pollModel,
+        model: "openai",
         messages: [systemPrompt, ...messages],
       }),
     });
     if (res.ok) {
       const text = await res.text();
-      // Pollinations returns plain text or JSON
       try {
         const data = JSON.parse(text);
         const reply = data?.choices?.[0]?.message?.content;
-        if (reply) {
-          console.log(`OK via Pollinations/${pollModel} (JSON)`);
-          return reply;
-        }
+        if (reply) return reply;
       } catch {
-        // Plain text response
-        if (text && !text.includes('"error"')) {
-          console.log(`OK via Pollinations/${pollModel} (text)`);
-          return text.trim();
-        }
+        if (text && !text.includes('"error"')) return text.trim();
       }
-    } else {
-      const errText = await res.text().catch(() => "");
-      console.error(`Pollinations error: ${res.status} ${errText.slice(0, 100)}`);
     }
-  } catch (err) {
-    console.error(`Pollinations failed:`, err);
-  }
+  } catch {}
   return null;
 }
 
-// === PROVIDER 2: Alpakyros (backup, butuh key) ===
+// === PROVIDER 3: Alpakyros (backup) ===
 async function askAlpakyros(
   messages: ChatMessage[],
   systemPrompt: ChatMessage,
   modelKey: string,
 ): Promise<string | null> {
   if (!_alpakyrosKey) return null;
-  const model = toAlpakyrosModel(modelKey);
   try {
     const res = await fetch("https://api.alpakyros.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${_alpakyrosKey}`,
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
         Accept: "application/json",
       },
       body: JSON.stringify({
-        model,
+        model: modelKey,
         messages: [systemPrompt, ...messages],
         stream: false,
       }),
@@ -131,34 +154,29 @@ async function askAlpakyros(
     if (res.ok) {
       const data = await res.json();
       const reply = data?.choices?.[0]?.message?.content;
-      if (reply) {
-        console.log(`OK via Alpakyros/${model}`);
-        return reply;
-      }
-    } else {
-      const errText = await res.text().catch(() => "");
-      console.error(`Alpakyros error: ${res.status} ${errText.slice(0, 100)}`);
+      if (reply) return reply;
     }
-  } catch (err) {
-    console.error(`Alpakyros failed:`, err);
-  }
+  } catch {}
   return null;
 }
 
-// Main: coba Pollinations dulu, lalu Alpakyros
+// Main: Groq → Pollinations → Alpakyros
 async function askAI(messages: ChatMessage[], persona: string, chosenModel?: string): Promise<string | null> {
   const systemPrompt: ChatMessage = {
     role: "system",
     content: PERSONAS[persona] ?? PERSONAS.umum,
   };
-
   const model = chosenModel ?? "kr/deepseek-3.2";
 
-  // 1) Pollinations (primary — free, no key, works from Vercel)
-  const pollResult = await askPollinations(messages, systemPrompt, model);
+  // 1) Groq (primary — fast, reliable)
+  const groqResult = await askGroq(messages, systemPrompt, model);
+  if (groqResult) return groqResult;
+
+  // 2) Pollinations (backup — free, no key)
+  const pollResult = await askPollinations(messages, systemPrompt);
   if (pollResult) return pollResult;
 
-  // 2) Alpakyros (backup — needs key)
+  // 3) Alpakyros (backup — needs key)
   const alpaResult = await askAlpakyros(messages, systemPrompt, model);
   if (alpaResult) return alpaResult;
 
