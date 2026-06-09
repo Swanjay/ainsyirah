@@ -32,7 +32,7 @@ type Settings = {
 
 function loadSettings(): Settings {
   const defaults: Settings = {
-    model: "mimo-flash",
+    model: "groq/llama-3.1-8b",
     customBaseUrl: "",
     customApiKey: "",
     useCustom: false,
@@ -50,7 +50,6 @@ function saveSettings(s: Settings) {
   } catch {}
 }
 
-/* Shared style helpers */
 const card = {
   background: "var(--surface)",
   border: "1px solid var(--border)",
@@ -104,6 +103,13 @@ export default function ChatPage() {
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
+  }
+
+  function clearChat() {
+    if (messages.length > 1) {
+      if (!confirm("Hapus semua chat? Riwayat akan dihapus permanen.")) return;
+    }
+    newChat();
   }
 
   async function copyText(text: string, idx: number) {
@@ -292,11 +298,12 @@ export default function ChatPage() {
             ⚙️
           </button>
           <button
-            onClick={newChat}
+            onClick={clearChat}
             className="flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 transition hover:opacity-80"
             style={{ ...card, color: "var(--ink-secondary)" }}
+            title="Hapus semua chat"
           >
-            ✚ Chat Baru
+            🗑️ Hapus
           </button>
         </div>
       </header>
