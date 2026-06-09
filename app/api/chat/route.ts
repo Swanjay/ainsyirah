@@ -1,6 +1,7 @@
 // Backend A'insyirah — menghubungkan chat ke API AI.
-// Mendukung Alpakyros (streaming SSE) dan Pollinations (JSON biasa).
-// Model free yang verified berfungsi: kr/claude-sonnet-4.5, kr/deepseek-3.2, kr/claude-haiku-4.5
+// Provider 1: Pollinations (free, tanpa key, anonymous tier)
+// Provider 2: Alpakyros (backup, butuh API key)
+// Model verified: openai-fast (GPT-OSS 20B) via Pollinations
 
 export const runtime = "nodejs";
 
@@ -9,20 +10,14 @@ type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 import { readFileSync } from "fs";
 import { join } from "path";
 
-// API key: prioritas ENV variable (Vercel), fallback ke file .key.b64 (lokal)
-let _apiKey = process.env.ALPAYKROS_KEY ?? "";
-if (!_apiKey) {
+// API key Alpakyros: prioritas ENV variable (Vercel), fallback ke file .key.b64 (lokal)
+let _alpakyrosKey = process.env.ALPAYKROS_KEY ?? "";
+if (!_alpakyrosKey) {
   try {
     const _keyPath = join(process.cwd(), ".key.b64");
-    _apiKey = Buffer.from(readFileSync(_keyPath, "utf-8").trim(), "base64").toString();
+    _alpakyrosKey = Buffer.from(readFileSync(_keyPath, "utf-8").trim(), "base64").toString();
   } catch {}
 }
-
-const ALPAKYROS = {
-  baseUrl: "https://api.alpakyros.com/v1/chat/completions",
-  apiKey: _apiKey,
-  models: ["kr/claude-sonnet-4.5", "kr/deepseek-3.2", "kr/claude-haiku-4.5"],
-};
 
 // Daftar "kepribadian" asisten
 const PERSONAS: Record<string, string> = {
@@ -47,82 +42,125 @@ const PERSONAS: Record<string, string> = {
     "dan sarankan merujuk pada ustadz/sumber terpercaya. Tetap ramah dan memberi semangat.",
 };
 
-// Parse respons SSE streaming dari Alpakyros jadi teks biasa
-function parseSSE(text: string): string {
-  const parts: string[] = [];
-  for (const line of text.split("\n")) {
-    if (!line.startsWith("data: ")) continue;
-    const data = line.slice(6).trim();
-    if (data === "[DONE]") break;
-    try {
-      const obj = JSON.parse(data);
-      const delta = obj.choices?.[0]?.delta?.content;
-      if (delta) parts.push(delta);
-    } catch {}
-  }
-  return parts.join("");
+// Map model frontend → model Pollinations
+function toPollinationsModel(modelKey: string): string {
+  const map: Record<string, string> = {
+    "kr/deepseek-3.2": "openai",
+    "kr/claude-sonnet-4.5": "openai",
+    "kr/claude-haiku-4.5": "openai",
+    "kr/claude-sonnet-4": "openai",
+    "kr/minimax-m2.5": "openai",
+    "kr/glm-5": "openai",
+  };
+  return map[modelKey] ?? "openai";
 }
 
-// Daftar model free yang verified berfungsi (untuk fallback)
-const FREE_MODELS = ["kr/deepseek-3.2", "kr/claude-sonnet-4.5", "kr/claude-haiku-4.5"];
+// Map model frontend → model Alpakyros
+function toAlpakyrosModel(modelKey: string): string {
+  // Alpakyros menggunakan nama asli
+  return modelKey;
+}
 
-// Coba panggil AI dengan fallback model
+// === PROVIDER 1: Pollinations (primary, free, tanpa key) ===
+// Endpoint: https://text.pollinations.ai/ (non-legacy, JSON response)
+async function askPollinations(
+  messages: ChatMessage[],
+  systemPrompt: ChatMessage,
+  modelKey: string,
+): Promise<string | null> {
+  const pollModel = toPollinationsModel(modelKey);
+  try {
+    const res = await fetch("https://text.pollinations.ai/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: pollModel,
+        messages: [systemPrompt, ...messages],
+      }),
+    });
+    if (res.ok) {
+      const text = await res.text();
+      // Pollinations returns plain text or JSON
+      try {
+        const data = JSON.parse(text);
+        const reply = data?.choices?.[0]?.message?.content;
+        if (reply) {
+          console.log(`OK via Pollinations/${pollModel} (JSON)`);
+          return reply;
+        }
+      } catch {
+        // Plain text response
+        if (text && !text.includes('"error"')) {
+          console.log(`OK via Pollinations/${pollModel} (text)`);
+          return text.trim();
+        }
+      }
+    } else {
+      const errText = await res.text().catch(() => "");
+      console.error(`Pollinations error: ${res.status} ${errText.slice(0, 100)}`);
+    }
+  } catch (err) {
+    console.error(`Pollinations failed:`, err);
+  }
+  return null;
+}
+
+// === PROVIDER 2: Alpakyros (backup, butuh key) ===
+async function askAlpakyros(
+  messages: ChatMessage[],
+  systemPrompt: ChatMessage,
+  modelKey: string,
+): Promise<string | null> {
+  if (!_alpakyrosKey) return null;
+  const model = toAlpakyrosModel(modelKey);
+  try {
+    const res = await fetch("https://api.alpakyros.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${_alpakyrosKey}`,
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [systemPrompt, ...messages],
+        stream: false,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const reply = data?.choices?.[0]?.message?.content;
+      if (reply) {
+        console.log(`OK via Alpakyros/${model}`);
+        return reply;
+      }
+    } else {
+      const errText = await res.text().catch(() => "");
+      console.error(`Alpakyros error: ${res.status} ${errText.slice(0, 100)}`);
+    }
+  } catch (err) {
+    console.error(`Alpakyros failed:`, err);
+  }
+  return null;
+}
+
+// Main: coba Pollinations dulu, lalu Alpakyros
 async function askAI(messages: ChatMessage[], persona: string, chosenModel?: string): Promise<string | null> {
   const systemPrompt: ChatMessage = {
     role: "system",
     content: PERSONAS[persona] ?? PERSONAS.umum,
   };
 
-  // Susun urutan model: pilihan user dulu, lalu fallback
-  const modelsToTry = chosenModel
-    ? [chosenModel, ...FREE_MODELS.filter((m) => m !== chosenModel)]
-    : FREE_MODELS;
+  const model = chosenModel ?? "kr/deepseek-3.2";
 
-  for (const model of modelsToTry) {
-    try {
-      const res = await fetch(ALPAKYROS.baseUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${ALPAKYROS.apiKey}`,
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [systemPrompt, ...messages],
-          stream: true,
-        }),
-      });
+  // 1) Pollinations (primary — free, no key, works from Vercel)
+  const pollResult = await askPollinations(messages, systemPrompt, model);
+  if (pollResult) return pollResult;
 
-      if (res.ok) {
-        const raw = await res.text();
-        const text = parseSSE(raw);
-        if (text) {
-          console.log(`A'insyirah OK via ${model}`);
-          return text;
-        }
-      } else {
-        const errText = await res.text().catch(() => "");
-        console.error(`Model ${model} error:`, res.status, errText.slice(0, 100));
-      }
-    } catch (err) {
-      console.error(`Model ${model} failed:`, err);
-    }
-  }
-
-  // Semua model gagal — coba Pollinations sebagai cadangan terakhir
-  try {
-    const res = await fetch("https://text.pollinations.ai/openai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "openai", messages: [systemPrompt, ...messages] }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const reply = data?.choices?.[0]?.message?.content;
-      if (reply) return reply;
-    }
-  } catch {}
+  // 2) Alpakyros (backup — needs key)
+  const alpaResult = await askAlpakyros(messages, systemPrompt, model);
+  if (alpaResult) return alpaResult;
 
   return null;
 }
@@ -144,15 +182,14 @@ export async function POST(request: Request) {
     const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
     return Response.json({
       reply:
-        "⚠️ (Mode demo — semua model AI sedang sibuk)\n\n" +
-        `Kamu bertanya: "${lastUser}"\n\n` +
-        "Coba lagi sebentar ya.",
+        "⚠️ Semua model AI sedang sibuk. Coba lagi dalam beberapa detik.\n\n" +
+        `Pertanyaanmu: "${lastUser}"`,
       mode: "demo",
     });
   } catch (err) {
     return Response.json(
       { error: "Terjadi kesalahan di server.", detail: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
