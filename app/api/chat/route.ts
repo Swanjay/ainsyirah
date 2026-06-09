@@ -1,131 +1,158 @@
-// A'insyirah AI Chat — terhubung ke 9router
-// API key 9router disimpan langsung di kode (web pribadi, tidak dipublikasikan ke GitHub).
+// Backend A'insyirah — menghubungkan chat ke API AI.
+// Mendukung Alpakyros (streaming SSE) dan Pollinations (JSON biasa).
+// Model free yang verified berfungsi: kr/claude-sonnet-4.5, kr/deepseek-3.2, kr/claude-haiku-4.5
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
-// 9router server — IP + port server kamu
-const DEFAULT_BASE = "http://47.131.2.66:20128/v1";
-// API key 9router — baca dari environment ATAU fallback ke hardcode
-const ROUTER_KEY = process.env.ROUTER_API_KEY || "PASTI_BEDAK";
+import { readFileSync } from "fs";
+import { join } from "path";
 
-// Model irit token — tambah model baru cukup tambah 1 baris
-const MODELS: Record<string, string> = {
-  "mimo-flash": "mimo/mimo-v2-flash",
-  "gpt": "cx/gpt-5.5", // GPT paling baru
-  deepseek: "kr/deepseek-3.2",
+// API key: prioritas ENV variable (Vercel), fallback ke file .key.b64 (lokal)
+let _apiKey = process.env.ALPAYKROS_KEY ?? "";
+if (!_apiKey) {
+  try {
+    const _keyPath = join(process.cwd(), ".key.b64");
+    _apiKey = Buffer.from(readFileSync(_keyPath, "utf-8").trim(), "base64").toString();
+  } catch {}
+}
+
+const ALPAKYROS = {
+  baseUrl: "https://api.alpakyros.com/v1/chat/completions",
+  apiKey: _apiKey,
+  models: ["kr/claude-sonnet-4.5", "kr/deepseek-3.2", "kr/claude-haiku-4.5"],
 };
-const DEFAULT_MODEL = "mimo-flash";
 
+// Daftar "kepribadian" asisten
 const PERSONAS: Record<string, string> = {
   umum:
-    "Kamu adalah A'insyirah, asisten AI ramah berbahasa Indonesia. " +
-    "Kamu membantu menjawab pertanyaan umum, menulis, menerjemahkan, menjelaskan pelajaran, dan memberi ide. " +
-    "Jawab dengan jelas, sopan, dan mudah dipahami. Gunakan bahasa sehari-hari.",
+    "Kamu adalah A'insyirah, asisten AI ramah berbahasa Indonesia (seperti ChatGPT). " +
+    "Kamu membantu menjawab pertanyaan umum, menulis, menerjemahkan, menjelaskan " +
+    "pelajaran, dan memberi ide. Jawab dengan jelas, sopan, dan mudah dipahami. " +
+    "Gunakan bahasa sehari-hari. Sesekali boleh memberi semangat yang positif.",
   belajar:
-    "Kamu adalah A'insyirah Mode Belajar — guru privat yang sabar. " +
-    "Jelaskan konsep dengan langkah sederhana, gunakan analogi, dan beri contoh.",
+    "Kamu adalah A'insyirah dalam Mode Belajar — seperti guru privat yang sabar. " +
+    "Jelaskan konsep dengan langkah-langkah sederhana, gunakan analogi sehari-hari, " +
+    "dan beri contoh. Hindari istilah rumit; kalau terpaksa pakai, jelaskan artinya. " +
+    "Akhiri dengan pertanyaan singkat untuk memastikan pengguna paham.",
   nulis:
-    "Kamu adalah A'insyirah Mode Menulis — asisten kreatif. " +
-    "Bantu buat caption, artikel, surat, atau teks menarik dan rapi.",
+    "Kamu adalah A'insyirah dalam Mode Menulis — asisten kreatif. " +
+    "Bantu membuat caption, artikel, surat, atau teks lain yang menarik dan rapi. " +
+    "Tawarkan beberapa variasi bila relevan, dan sesuaikan gaya bahasa dengan permintaan.",
   islami:
-    "Kamu adalah A'insyirah Mode Islami — santun dan bernuansa religius. " +
-    "Jawab dengan adab Islami, boleh sertakan dalil jika yakin.",
+    "Kamu adalah A'insyirah dalam Mode Islami — asisten yang santun dan bernuansa religius. " +
+    "Jawab dengan adab Islami, boleh menyertakan dalil (ayat/hadis) bila relevan dan kamu yakin " +
+    "kebenarannya, serta sebutkan sumbernya. Jika tidak yakin pada suatu dalil, katakan dengan jujur " +
+    "dan sarankan merujuk pada ustadz/sumber terpercaya. Tetap ramah dan memberi semangat.",
 };
 
-async function askAI(messages: ChatMessage[], opt: {
-  baseUrl: string; apiKey: string; model: string; persona: string;
-}, tries = 2): Promise<{ reply: string | null; error?: string }> {
-  const sys: ChatMessage = { role: "system", content: PERSONAS[opt.persona] ?? PERSONAS.umum };
-  const url = opt.baseUrl.replace(/\/$/, "") + "/chat/completions";
-
-  for (let i = 0; i < tries; i++) {
+// Parse respons SSE streaming dari Alpakyros jadi teks biasa
+function parseSSE(text: string): string {
+  const parts: string[] = [];
+  for (const line of text.split("\n")) {
+    if (!line.startsWith("data: ")) continue;
+    const data = line.slice(6).trim();
+    if (data === "[DONE]") break;
     try {
-      const res = await fetch(url, {
+      const obj = JSON.parse(data);
+      const delta = obj.choices?.[0]?.delta?.content;
+      if (delta) parts.push(delta);
+    } catch {}
+  }
+  return parts.join("");
+}
+
+// Daftar model free yang verified berfungsi (untuk fallback)
+const FREE_MODELS = ["kr/deepseek-3.2", "kr/claude-sonnet-4.5", "kr/claude-haiku-4.5"];
+
+// Coba panggil AI dengan fallback model
+async function askAI(messages: ChatMessage[], persona: string, chosenModel?: string): Promise<string | null> {
+  const systemPrompt: ChatMessage = {
+    role: "system",
+    content: PERSONAS[persona] ?? PERSONAS.umum,
+  };
+
+  // Susun urutan model: pilihan user dulu, lalu fallback
+  const modelsToTry = chosenModel
+    ? [chosenModel, ...FREE_MODELS.filter((m) => m !== chosenModel)]
+    : FREE_MODELS;
+
+  for (const model of modelsToTry) {
+    try {
+      const res = await fetch(ALPAKYROS.baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(opt.apiKey ? { Authorization: `Bearer ${opt.apiKey}` } : {}),
+          Authorization: `Bearer ${ALPAKYROS.apiKey}`,
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         },
         body: JSON.stringify({
-          model: opt.model,
-          messages: [sys, ...messages],
-          stream: false,
-          max_tokens: 1500,
+          model,
+          messages: [systemPrompt, ...messages],
+          stream: true,
         }),
       });
-      const text = await res.text();
+
       if (res.ok) {
-        try {
-          const data = JSON.parse(text);
-          const reply = data?.choices?.[0]?.message?.content;
-          if (reply?.trim()) return { reply };
-        } catch {}
+        const raw = await res.text();
+        const text = parseSSE(raw);
+        if (text) {
+          console.log(`A'insyirah OK via ${model}`);
+          return text;
+        }
+      } else {
+        const errText = await res.text().catch(() => "");
+        console.error(`Model ${model} error:`, res.status, errText.slice(0, 100));
       }
-      if (i === tries - 1) return { reply: null, error: `HTTP ${res.status}` };
     } catch (err) {
-      if (i === tries - 1) return { reply: null, error: String(err).slice(0, 200) };
+      console.error(`Model ${model} failed:`, err);
     }
-    if (i < tries - 1) await new Promise(r => setTimeout(r, 800));
   }
-  return { reply: null, error: "No response" };
-}
 
-// GET — debug info
-export async function GET() {
-  let router = "unknown";
+  // Semua model gagal — coba Pollinations sebagai cadangan terakhir
   try {
-    const r = await fetch(DEFAULT_BASE + "/models", {
-      headers: ROUTER_KEY ? { Authorization: `Bearer ${ROUTER_KEY}` } : {},
-      signal: AbortSignal.timeout(8000),
+    const res = await fetch("https://text.pollinations.ai/openai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "openai", messages: [systemPrompt, ...messages] }),
     });
-    router = `HTTP ${r.status}`;
-  } catch (e) { router = String(e).slice(0, 100); }
+    if (res.ok) {
+      const data = await res.json();
+      const reply = data?.choices?.[0]?.message?.content;
+      if (reply) return reply;
+    }
+  } catch {}
 
-  return Response.json({
-    hasKey: !!ROUTER_KEY,
-    keyLen: ROUTER_KEY.length,
-    router,
-    models: Object.keys(MODELS),
-  });
+  return null;
 }
 
-// POST — chat
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as {
-      messages: ChatMessage[]; mode?: string; model?: string;
-      customBaseUrl?: string; customApiKey?: string;
+    const { messages, mode, model } = (await request.json()) as {
+      messages: ChatMessage[];
+      mode?: string;
+      model?: string;
     };
 
-    let baseUrl = DEFAULT_BASE;
-    let apiKey = ROUTER_KEY;
-    let model = MODELS[body.model ?? DEFAULT_MODEL] ?? MODELS[DEFAULT_MODEL];
+    const reply = await askAI(messages, mode ?? "umum", model);
 
-    // Server pribadi override
-    if (body.customBaseUrl?.trim()) {
-      baseUrl = body.customBaseUrl.trim();
-      apiKey = body.customApiKey?.trim() ?? "";
-      model = (body.model ?? DEFAULT_MODEL).trim();
+    if (reply) {
+      return Response.json({ reply, mode: "live" });
     }
 
-    const result = await askAI(body.messages, {
-      baseUrl, apiKey, model, persona: body.mode ?? "umum",
-    });
-
-    if (result.reply) {
-      return Response.json({ reply: result.reply, mode: "live", model });
-    }
-
+    const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
     return Response.json({
-      reply: "⚠️ AI tidak merespons. " + (result.error ? `(${result.error})` : "") +
-        "\nCoba model lain di ⚙️ atau cek koneksi server.",
-      mode: "offline",
-      debug: { baseUrl, model, hasKey: !!apiKey, error: result.error },
+      reply:
+        "⚠️ (Mode demo — semua model AI sedang sibuk)\n\n" +
+        `Kamu bertanya: "${lastUser}"\n\n` +
+        "Coba lagi sebentar ya.",
+      mode: "demo",
     });
   } catch (err) {
-    return Response.json({ error: String(err) }, { status: 500 });
+    return Response.json(
+      { error: "Terjadi kesalahan di server.", detail: String(err) },
+      { status: 500 }
+    );
   }
 }

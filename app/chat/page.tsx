@@ -6,9 +6,12 @@ import { useState, useRef, useEffect } from "react";
 type Message = { role: "user" | "assistant"; content: string };
 
 const MODELS = [
-  { key: "mimo-flash", label: "⚡ MiMo Flash (paling hemat)", default: true },
-  { key: "gpt", label: "🧠 GPT-5.4 (OpenAI)" },
-  { key: "deepseek", label: "🔮 DeepSeek (murah)" },
+  { key: "kr/deepseek-3.2", label: "🔮 DeepSeek 3.2 (cepat & ringan)", default: true },
+  { key: "kr/claude-sonnet-4.5", label: "🧠 Claude Sonnet 4.5 (terbaik)" },
+  { key: "kr/claude-haiku-4.5", label: "⚡ Claude Haiku 4.5 (paling ringan)" },
+  { key: "kr/claude-sonnet-4", label: "💬 Claude Sonnet 4" },
+  { key: "kr/minimax-m2.5", label: "✨ MiniMax M2.5" },
+  { key: "kr/glm-5", label: "🌟 GLM-5" },
 ];
 
 const GREETING: Message = {
