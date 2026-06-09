@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ThemeToggle from "./components/ThemeToggle";
 
 export default function Home() {
   return (
@@ -8,22 +9,21 @@ export default function Home() {
         <div className="flex items-center gap-2 text-xl tracking-tight" style={{ fontFamily: "var(--font-display)", fontWeight: 700 }}>
           <span className="text-2xl">🌙</span> A&apos;insyirah
         </div>
-        <Link
-          href="/chat"
-          className="rounded-full text-white px-5 py-2 text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:opacity-90"
-          style={{ background: "var(--gold)", transitionTimingFunction: "var(--ease-out-expo)", transitionDuration: "var(--duration-normal)" }}
-        >
-          Mulai Chat ✨
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link
+            href="/chat"
+            className="rounded-full text-white px-5 py-2 text-sm font-semibold shadow-md hover:shadow-lg hover:opacity-90 transition-all duration-250"
+            style={{ background: "var(--gold)", transitionTimingFunction: "var(--ease-out-expo)" }}
+          >
+            Mulai Chat ✨
+          </Link>
+        </div>
       </nav>
 
       {/* HERO */}
       <section className="px-6 pt-16 pb-20 text-center max-w-2xl mx-auto relative">
-        {/* dekorasi blur */}
-        <div
-          className="absolute top-10 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full blur-3xl -z-10"
-          style={{ background: "rgba(202, 168, 106, 0.08)" }}
-        />
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full blur-3xl -z-10" style={{ background: "var(--glow)" }} />
 
         <span
           className="inline-block rounded-full border px-5 py-1.5 text-xs font-medium mb-8 shadow-sm"
@@ -37,10 +37,7 @@ export default function Home() {
           style={{ fontFamily: "var(--font-display)", color: "var(--ink)", fontWeight: 700, letterSpacing: "-0.02em" }}
         >
           Tanya apa saja,
-          <span
-            className="block mt-1"
-            style={{ color: "var(--gold)" }}
-          >
+          <span className="block mt-1" style={{ color: "var(--gold)" }}>
             A&apos;insyirah siap bantu
           </span>
         </h1>
@@ -73,12 +70,7 @@ export default function Home() {
           className="mt-14 px-8 py-8 shadow-sm"
           style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--surface)" }}
         >
-          <p
-            className="text-2xl sm:text-3xl leading-loose"
-            style={{ color: "var(--ink-secondary)" }}
-            dir="rtl"
-            lang="ar"
-          >
+          <p className="text-2xl sm:text-3xl leading-loose" style={{ color: "var(--ink-secondary)" }} dir="rtl" lang="ar">
             فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ۝ إِنَّ مَعَ الْعُسْرِ يُسْرًا
           </p>
           <p className="mt-4 text-sm italic" style={{ color: "var(--ink-muted)" }}>
@@ -96,10 +88,7 @@ export default function Home() {
 
       {/* FITUR */}
       <section className="px-6 py-16 max-w-4xl mx-auto">
-        <h2
-          className="text-2xl font-bold text-center mb-4"
-          style={{ fontFamily: "var(--font-display)", color: "var(--ink)" }}
-        >
+        <h2 className="text-2xl font-bold text-center mb-4" style={{ fontFamily: "var(--font-display)", color: "var(--ink)" }}>
           Apa yang Bisa Ditanyakan?
         </h2>
         <p className="text-center text-sm mb-10" style={{ color: "var(--ink-muted)" }}>
@@ -107,24 +96,9 @@ export default function Home() {
         </p>
         <div className="grid sm:grid-cols-3 gap-5">
           {[
-            {
-              icon: "💬",
-              title: "Tanya Jawab",
-              desc: "Tanya apa saja, dari pelajaran sampai hal sehari-hari.",
-              bg: "linear-gradient(135deg, #fef3e2, #fdf8f0)",
-            },
-            {
-              icon: "✍️",
-              title: "Bantu Menulis",
-              desc: "Buat caption, surat, artikel, atau ringkasan teks.",
-              bg: "linear-gradient(135deg, #f0f4e8, #f7faf2)",
-            },
-            {
-              icon: "🌐",
-              title: "Terjemah & Ide",
-              desc: "Terjemahkan bahasa atau cari ide kreatif.",
-              bg: "linear-gradient(135deg, #e8f0f8, #f2f6fc)",
-            },
+            { icon: "💬", title: "Tanya Jawab", desc: "Tanya apa saja, dari pelajaran sampai hal sehari-hari." },
+            { icon: "✍️", title: "Bantu Menulis", desc: "Buat caption, surat, artikel, atau ringkasan teks." },
+            { icon: "🌐", title: "Terjemah & Ide", desc: "Terjemahkan bahasa atau cari ide kreatif." },
           ].map((f) => (
             <div
               key={f.title}
@@ -132,31 +106,23 @@ export default function Home() {
               style={{
                 borderRadius: "var(--radius-md)",
                 border: "1px solid var(--border)",
-                background: f.bg,
+                background: "var(--surface)",
                 transitionTimingFunction: "var(--ease-out-expo)",
               }}
             >
               <div className="text-4xl mb-3">{f.icon}</div>
-              <h3
-                className="text-lg mb-2"
-                style={{ fontFamily: "var(--font-display)", fontWeight: 600, color: "var(--ink)" }}
-              >
+              <h3 className="text-lg mb-2" style={{ fontFamily: "var(--font-display)", fontWeight: 600, color: "var(--ink)" }}>
                 {f.title}
               </h3>
-              <p className="text-sm leading-relaxed" style={{ color: "var(--ink-secondary)" }}>
-                {f.desc}
-              </p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--ink-secondary)" }}>{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* TIGA MODE */}
+      {/* MODE */}
       <section className="px-6 py-12 max-w-3xl mx-auto">
-        <h2
-          className="text-xl font-bold text-center mb-8"
-          style={{ fontFamily: "var(--font-display)", color: "var(--ink)" }}
-        >
+        <h2 className="text-xl font-bold text-center mb-8" style={{ fontFamily: "var(--font-display)", color: "var(--ink)" }}>
           🎭 Pilih Gaya Bicara
         </h2>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -187,13 +153,11 @@ export default function Home() {
           href="https://www.tiktok.com/@insyirah694"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 font-medium transition-colors duration-200 hover:opacity-80"
+          className="inline-flex items-center gap-1.5 font-medium transition-opacity duration-200 hover:opacity-80"
         >
           🎵 Ikuti di TikTok @insyirah694
         </a>
-        <p className="mt-3">
-          A&apos;insyirah · Asisten AI · {new Date().getFullYear()}
-        </p>
+        <p className="mt-3">A&apos;insyirah · Asisten AI · {new Date().getFullYear()}</p>
       </footer>
     </main>
   );

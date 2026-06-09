@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import ThemeToggle from "../components/ThemeToggle";
+import VoiceInput from "../components/VoiceInput";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -50,9 +52,22 @@ function saveSettings(s: Settings) {
   } catch {}
 }
 
+/* Shared style helpers */
+const card = {
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-md)",
+};
+
+const input = {
+  background: "var(--input-bg)",
+  border: "1px solid var(--input-border)",
+  color: "var(--ink)",
+};
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([GREETING]);
-  const [input, setInput] = useState("");
+  const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [settings, setSettings] = useState<Settings>(loadSettings);
@@ -83,11 +98,11 @@ export default function ChatPage() {
       taRef.current.style.height = "auto";
       taRef.current.style.height = Math.min(taRef.current.scrollHeight, 140) + "px";
     }
-  }, [input]);
+  }, [inputText]);
 
   function newChat() {
     setMessages([GREETING]);
-    setInput("");
+    setInputText("");
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
@@ -108,7 +123,6 @@ export default function ChatPage() {
 
   function saveAndClose() {
     const s = { ...tempSettings };
-    // Kalau server default dipilih, kosongkan custom
     if (!s.useCustom) {
       s.customBaseUrl = "";
       s.customApiKey = "";
@@ -119,12 +133,12 @@ export default function ChatPage() {
   }
 
   async function sendMessage() {
-    const text = input.trim();
+    const text = inputText.trim();
     if (!text || loading) return;
 
     const newMessages: Message[] = [...messages, { role: "user", content: text }];
     setMessages(newMessages);
-    setInput("");
+    setInputText("");
     setLoading(true);
 
     try {
@@ -164,6 +178,11 @@ export default function ChatPage() {
     }
   }
 
+  const onVoiceResult = useCallback((text: string) => {
+    setInputText((prev) => (prev ? prev + " " + text : text));
+    taRef.current?.focus();
+  }, []);
+
   const suggestions = [
     "Jelaskan fotosintesis dengan sederhana",
     "Buatkan caption untuk postingan motivasi",
@@ -173,20 +192,20 @@ export default function ChatPage() {
   const currentModelLabel = MODELS.find((m) => m.key === settings.model)?.label ?? settings.model;
 
   return (
-    <div className="flex flex-col h-screen bg-[#faf6ef] text-[#3a352e]">
+    <div className="flex flex-col h-screen" style={{ background: "var(--bg)", color: "var(--ink)" }}>
       {/* PANEL PENGATURAN (overlay) */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center px-4">
-          <div className="bg-[#f6efe1] rounded-2xl shadow-xl border border-[#e8dcc4] w-full max-w-md p-6 space-y-5">
-            <h2 className="text-lg font-semibold text-[#2e2a23]">⚙️ Pengaturan AI</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.3)" }}>
+          <div className="rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5" style={{ ...card, background: "var(--surface-elevated)" }}>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--ink)" }}>⚙️ Pengaturan AI</h2>
 
-            {/* Pilihan Model */}
             <div>
-              <label className="block text-sm font-medium text-[#7a6c4d] mb-1">Model AI</label>
+              <label className="block text-sm font-medium mb-1" style={{ color: "var(--ink-secondary)" }}>Model AI</label>
               <select
                 value={tempSettings.model}
                 onChange={(e) => setTempSettings({ ...tempSettings, model: e.target.value })}
-                className="w-full rounded-xl border border-[#e0d4bd] bg-white px-4 py-2.5 text-sm outline-none focus:border-[#caa86a]"
+                className="w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                style={{ ...input, borderRadius: "var(--radius-md)" }}
               >
                 {MODELS.map((m) => (
                   <option key={m.key} value={m.key}>{m.label}</option>
@@ -194,47 +213,46 @@ export default function ChatPage() {
               </select>
             </div>
 
-            {/* Toggle Server Pribadi */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setTempSettings({ ...tempSettings, useCustom: !tempSettings.useCustom })}
-                className={`relative w-11 h-6 rounded-full transition-colors ${
-                  tempSettings.useCustom ? "bg-[#caa86a]" : "bg-[#d5ccba]"
-                }`}
+                className="relative w-11 h-6 rounded-full transition-colors"
+                style={{ background: tempSettings.useCustom ? "var(--gold)" : "var(--border)" }}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                    tempSettings.useCustom ? "translate-x-5" : ""
-                  }`}
+                  className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow transition-transform"
+                  style={{ background: "var(--surface-solid)", transform: tempSettings.useCustom ? "translateX(20px)" : "none" }}
                 />
               </button>
-              <span className="text-sm text-[#3a352e]">Gunakan server pribadi</span>
+              <span className="text-sm" style={{ color: "var(--ink)" }}>Gunakan server pribadi</span>
             </div>
 
             {tempSettings.useCustom && (
-              <div className="space-y-3 bg-white rounded-xl border border-[#e0d4bd] p-4">
+              <div className="space-y-3 p-4" style={{ ...card }}>
                 <div>
-                  <label className="block text-xs text-[#7a6c4d] mb-1">Base URL server (contoh: http://192.168.1.100:20128/v1)</label>
+                  <label className="block text-xs mb-1" style={{ color: "var(--ink-secondary)" }}>Base URL server</label>
                   <input
                     type="text"
                     value={tempSettings.customBaseUrl}
                     onChange={(e) => setTempSettings({ ...tempSettings, customBaseUrl: e.target.value })}
                     placeholder="http://IP-KAMU:PORT/v1"
-                    className="w-full rounded-lg border border-[#e0d4bd] px-3 py-2 text-sm outline-none focus:border-[#caa86a] placeholder:text-[#bcae8e]"
+                    className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+                    style={{ ...input, borderRadius: "var(--radius-sm)" }}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-[#7a6c4d] mb-1">API Key (opsional)</label>
+                  <label className="block text-xs mb-1" style={{ color: "var(--ink-secondary)" }}>API Key (opsional)</label>
                   <input
                     type="password"
                     value={tempSettings.customApiKey}
                     onChange={(e) => setTempSettings({ ...tempSettings, customApiKey: e.target.value })}
                     placeholder="Ketik API key server kamu"
-                    className="w-full rounded-lg border border-[#e0d4bd] px-3 py-2 text-sm outline-none focus:border-[#caa86a] placeholder:text-[#bcae8e]"
+                    className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+                    style={{ ...input, borderRadius: "var(--radius-sm)" }}
                   />
                 </div>
-                <p className="text-[11px] text-[#bcae8e]">
-                  Data tersimpan di browser kamu saja — tidak dikirim ke server manapun selain server yang kamu isi di atas.
+                <p className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                  Data tersimpan di browser kamu saja.
                 </p>
               </div>
             )}
@@ -242,13 +260,15 @@ export default function ChatPage() {
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setShowSettings(false)}
-                className="px-4 py-2 text-sm text-[#7a6c4d] rounded-xl border border-[#e0d4bd] hover:bg-[#ece2cf] transition"
+                className="px-4 py-2 text-sm rounded-xl transition"
+                style={{ color: "var(--ink-secondary)", border: "1px solid var(--border)" }}
               >
                 Batal
               </button>
               <button
                 onClick={saveAndClose}
-                className="px-4 py-2 text-sm font-semibold text-white bg-[#caa86a] rounded-xl hover:bg-[#b8965a] transition"
+                className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition hover:opacity-90"
+                style={{ background: "var(--gold)" }}
               >
                 Simpan
               </button>
@@ -258,24 +278,29 @@ export default function ChatPage() {
       )}
 
       {/* HEADER */}
-      <header className="flex items-center gap-3 px-5 py-4 border-b border-[#e8dcc4] bg-[#f6efe1]">
-        <Link href="/" className="text-[#a99a78] hover:text-[#7a6c4d] text-sm">← Kembali</Link>
-        <div className="flex items-center gap-2 ml-2 text-[#2e2a23]" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.125rem" }}>
+      <header className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: "1px solid var(--border)", background: "var(--header-bg)" }}>
+        <Link href="/" className="text-sm hover:opacity-80 transition" style={{ color: "var(--ink-muted)" }}>← Kembali</Link>
+        <div className="flex items-center gap-2 ml-2" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.125rem", color: "var(--ink)" }}>
           <span className="text-xl">🌙</span> A&apos;insyirah
         </div>
-        <button
-          onClick={openSettings}
-          title="Pengaturan AI"
-          className="ml-auto text-[#a99a78] hover:text-[#7a6c4d] text-lg leading-none transition px-2"
-        >
-          ⚙️
-        </button>
-        <button
-          onClick={newChat}
-          className="flex items-center gap-1.5 text-xs rounded-full border border-[#e0d4bd] bg-white px-3 py-1.5 text-[#7a6c4d] hover:bg-[#f3ead9] transition"
-        >
-          ✚ Chat Baru
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            onClick={openSettings}
+            title="Pengaturan AI"
+            className="text-lg leading-none transition px-2 hover:opacity-80"
+            style={{ color: "var(--ink-muted)" }}
+          >
+            ⚙️
+          </button>
+          <button
+            onClick={newChat}
+            className="flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 transition hover:opacity-80"
+            style={{ ...card, color: "var(--ink-secondary)" }}
+          >
+            ✚ Chat Baru
+          </button>
+        </div>
       </header>
 
       {/* PESAN */}
@@ -286,18 +311,21 @@ export default function ChatPage() {
             className={`group flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap ${
-                m.role === "user"
-                  ? "bg-[#caa86a] text-white rounded-br-sm"
-                  : "bg-white border border-[#ece2cf] text-[#3a352e] rounded-bl-sm"
-              }`}
+              className="max-w-[80%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap"
+              style={{
+                background: m.role === "user" ? "var(--chat-user-bg)" : "var(--chat-bot-bg)",
+                color: m.role === "user" ? "var(--chat-user-text)" : "var(--chat-bot-text)",
+                border: m.role === "assistant" ? "1px solid var(--chat-bot-border)" : "none",
+                borderRadius: m.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+              }}
             >
               {m.content}
             </div>
             {m.role === "assistant" && i > 0 && (
               <button
                 onClick={() => copyText(m.content, i)}
-                className="mt-1 text-[11px] text-[#a99a78] hover:text-[#7a6c4d] opacity-0 group-hover:opacity-100 transition"
+                className="mt-1 text-[11px] opacity-0 group-hover:opacity-100 transition"
+                style={{ color: "var(--ink-muted)" }}
               >
                 {copiedIdx === i ? "✓ Tersalin" : "⧉ Salin"}
               </button>
@@ -306,11 +334,11 @@ export default function ChatPage() {
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white border border-[#ece2cf] rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-[#a99a78]">
+            <div className="rounded-2xl rounded-bl-sm px-4 py-3 text-sm" style={{ background: "var(--chat-bot-bg)", border: "1px solid var(--chat-bot-border)", color: "var(--ink-muted)" }}>
               <span className="inline-flex gap-1">
-                <span className="animate-pulse [animation-timing-function:cubic-bezier(0.16,1,0.3,1)]">●</span>
-                <span className="animate-pulse [animation-delay:0.2s] [animation-timing-function:cubic-bezier(0.16,1,0.3,1)]">●</span>
-                <span className="animate-pulse [animation-delay:0.4s] [animation-timing-function:cubic-bezier(0.16,1,0.3,1)]">●</span>
+                <span className="animate-pulse" style={{ animationTimingFunction: "var(--ease-out-expo)" }}>●</span>
+                <span className="animate-pulse [animation-delay:0.2s]" style={{ animationTimingFunction: "var(--ease-out-expo)" }}>●</span>
+                <span className="animate-pulse [animation-delay:0.4s]" style={{ animationTimingFunction: "var(--ease-out-expo)" }}>●</span>
               </span>
             </div>
           </div>
@@ -324,8 +352,9 @@ export default function ChatPage() {
           {suggestions.map((s) => (
             <button
               key={s}
-              onClick={() => setInput(s)}
-              className="text-xs rounded-full border border-[#e0d4bd] bg-[#f3ead9] px-3 py-1.5 text-[#7a6c4d] hover:bg-[#ece2cf] transition"
+              onClick={() => setInputText(s)}
+              className="text-xs rounded-full px-3 py-1.5 transition hover:opacity-80"
+              style={{ ...card, color: "var(--suggestion-text)" }}
             >
               {s}
             </button>
@@ -334,26 +363,29 @@ export default function ChatPage() {
       )}
 
       {/* INPUT */}
-      <div className="border-t border-[#e8dcc4] bg-[#f6efe1] px-4 py-4">
+      <div className="px-4 py-4" style={{ borderTop: "1px solid var(--border)", background: "var(--header-bg)" }}>
         <div className="max-w-2xl w-full mx-auto flex gap-2 items-end">
           <textarea
             ref={taRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
             onKeyDown={onKeyDown}
             rows={1}
             placeholder="Ketik pesanmu... (Enter kirim, Shift+Enter baris baru)"
-            className="flex-1 resize-none rounded-2xl bg-white border border-[#e0d4bd] px-5 py-3 text-[15px] outline-none placeholder:text-[#bcae8e] focus:border-[#caa86a] leading-relaxed"
+            className="flex-1 resize-none rounded-2xl px-5 py-3 text-[15px] outline-none leading-relaxed"
+            style={{ ...input, borderRadius: "16px" }}
           />
+          <VoiceInput onResult={onVoiceResult} disabled={loading} />
           <button
             onClick={sendMessage}
-            disabled={loading || !input.trim()}
-            className="rounded-full bg-[#caa86a] text-white px-6 py-3 text-sm font-semibold hover:bg-[#b8965a] disabled:opacity-40 transition shrink-0"
+            disabled={loading || !inputText.trim()}
+            className="rounded-full text-white px-6 py-3 text-sm font-semibold hover:opacity-90 disabled:opacity-40 transition shrink-0"
+            style={{ background: "var(--gold)" }}
           >
             Kirim
           </button>
         </div>
-        <p className="max-w-2xl mx-auto text-center text-[11px] text-[#bcae8e] mt-2">
+        <p className="max-w-2xl mx-auto text-center text-[11px] mt-2" style={{ color: "var(--ink-muted)" }}>
           {currentModelLabel} · Riwayat tersimpan di perangkatmu.
         </p>
       </div>
