@@ -2,15 +2,16 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#fdf8f0] via-[#faf6ef] to-[#f3ead9] text-[#3a352e] overflow-hidden">
+    <main className="min-h-screen overflow-hidden" style={{ background: "linear-gradient(to bottom, var(--bg), var(--bg-alt))" }}>
       {/* NAVBAR */}
       <nav className="flex items-center justify-between px-6 py-5 max-w-5xl mx-auto">
-        <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
+        <div className="flex items-center gap-2 text-xl tracking-tight" style={{ fontFamily: "var(--font-display)", fontWeight: 700 }}>
           <span className="text-2xl">🌙</span> A&apos;insyirah
         </div>
         <Link
           href="/chat"
-          className="rounded-full bg-[#caa86a] text-white px-5 py-2 text-sm font-semibold hover:bg-[#b8965a] transition shadow-md hover:shadow-lg"
+          className="rounded-full text-white px-5 py-2 text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:opacity-90"
+          style={{ background: "var(--gold)", transitionTimingFunction: "var(--ease-out-expo)", transitionDuration: "var(--duration-normal)" }}
         >
           Mulai Chat ✨
         </Link>
@@ -19,20 +20,32 @@ export default function Home() {
       {/* HERO */}
       <section className="px-6 pt-16 pb-20 text-center max-w-2xl mx-auto relative">
         {/* dekorasi blur */}
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-80 h-80 bg-[#caa86a]/10 rounded-full blur-3xl -z-10" />
+        <div
+          className="absolute top-10 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full blur-3xl -z-10"
+          style={{ background: "rgba(202, 168, 106, 0.08)" }}
+        />
 
-        <span className="inline-block rounded-full border border-[#e0d4bd] bg-white/70 backdrop-blur px-5 py-1.5 text-xs font-medium text-[#8a7a55] mb-8 shadow-sm">
+        <span
+          className="inline-block rounded-full border px-5 py-1.5 text-xs font-medium mb-8 shadow-sm"
+          style={{ borderColor: "var(--border)", background: "var(--surface)", color: "var(--ink-muted)" }}
+        >
           ✨ Asisten AI Pintar Berbahasa Indonesia
         </span>
 
-        <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight text-[#2e2a23]">
+        <h1
+          className="text-4xl sm:text-5xl font-bold leading-tight"
+          style={{ fontFamily: "var(--font-display)", color: "var(--ink)", fontWeight: 700, letterSpacing: "-0.02em" }}
+        >
           Tanya apa saja,
-          <span className="block mt-1 bg-gradient-to-r from-[#caa86a] to-[#b8965a] bg-clip-text text-transparent">
+          <span
+            className="block mt-1"
+            style={{ color: "var(--gold)" }}
+          >
             A&apos;insyirah siap bantu
           </span>
         </h1>
 
-        <p className="mt-6 text-lg text-[#6b6353] leading-relaxed max-w-lg mx-auto">
+        <p className="mt-6 text-lg leading-relaxed max-w-lg mx-auto" style={{ color: "var(--ink-secondary)" }}>
           Asisten AI yang bisa diajak ngobrol, menjawab pertanyaan, menulis,
           menerjemahkan, membuat ide, dan banyak lagi — gratis dan mudah dipakai.
         </p>
@@ -41,50 +54,98 @@ export default function Home() {
         <div className="mt-10">
           <Link
             href="/chat"
-            className="group rounded-full bg-gradient-to-r from-[#caa86a] to-[#b8965a] text-white px-10 py-4 font-bold hover:shadow-xl hover:scale-105 transition-all duration-200 inline-block shadow-lg text-lg"
+            className="group text-white px-10 py-4 font-bold inline-block shadow-lg text-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+            style={{
+              background: "linear-gradient(135deg, var(--gold), var(--gold-dark))",
+              borderRadius: "var(--radius-pill)",
+              transitionTimingFunction: "var(--ease-out-expo)",
+            }}
           >
             🚀 Mulai Ngobrol Gratis
           </Link>
-          <p className="mt-3 text-xs text-[#a99a78]">Tanpa daftar · Tanpa biaya · Langsung pakai</p>
+          <p className="mt-3 text-xs" style={{ color: "var(--ink-muted)" }}>
+            Tanpa daftar · Tanpa biaya · Langsung pakai
+          </p>
         </div>
 
         {/* AYAT / MOTTO */}
-        <div className="mt-14 rounded-3xl border border-[#e8dcc4] bg-white/50 backdrop-blur-sm px-8 py-8 shadow-sm">
-          <p className="text-2xl sm:text-3xl leading-loose text-[#5a513f]" dir="rtl" lang="ar">
+        <div
+          className="mt-14 px-8 py-8 shadow-sm"
+          style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--surface)" }}
+        >
+          <p
+            className="text-2xl sm:text-3xl leading-loose"
+            style={{ color: "var(--ink-secondary)" }}
+            dir="rtl"
+            lang="ar"
+          >
             فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ۝ إِنَّ مَعَ الْعُسْرِ يُسْرًا
           </p>
-          <p className="mt-4 text-sm italic text-[#8a7a55]">
+          <p className="mt-4 text-sm italic" style={{ color: "var(--ink-muted)" }}>
             &ldquo;Fa inna ma&apos;al &apos;usri yusra, inna ma&apos;al &apos;usri yusra&rdquo;
           </p>
-          <p className="mt-2 text-sm text-[#6b6353]">
+          <p className="mt-2 text-sm" style={{ color: "var(--ink-secondary)" }}>
             Sesungguhnya setiap kesulitan disertai kemudahan. Sesungguhnya setiap
             kesulitan disertai kemudahan.
           </p>
-          <p className="mt-3 text-xs text-[#a99a78] font-medium">— QS. Al-Insyirah: 5-6</p>
+          <p className="mt-3 text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
+            — QS. Al-Insyirah: 5-6
+          </p>
         </div>
       </section>
 
       {/* FITUR */}
       <section className="px-6 py-16 max-w-4xl mx-auto">
-        <h2 className="text-2xl font-bold text-center mb-4 text-[#2e2a23]">
+        <h2
+          className="text-2xl font-bold text-center mb-4"
+          style={{ fontFamily: "var(--font-display)", color: "var(--ink)" }}
+        >
           Apa yang Bisa Ditanyakan?
         </h2>
-        <p className="text-center text-sm text-[#8a7a55] mb-10">
+        <p className="text-center text-sm mb-10" style={{ color: "var(--ink-muted)" }}>
           A&apos;insyirah dibekali AI canggih untuk membantumu dalam berbagai hal.
         </p>
         <div className="grid sm:grid-cols-3 gap-5">
           {[
-            { icon: "💬", title: "Tanya Jawab", desc: "Tanya apa saja, dari pelajaran sampai hal sehari-hari.", color: "from-[#fef3e2] to-[#fdf8f0]" },
-            { icon: "✍️", title: "Bantu Menulis", desc: "Buat caption, surat, artikel, atau ringkasan teks.", color: "from-[#f0f6fe] to-[#f6fafe]" },
-            { icon: "🌐", title: "Terjemah & Ide", desc: "Terjemahkan bahasa atau cari ide kreatif.", color: "from-[#f2fef4] to-[#f7fef8]" },
+            {
+              icon: "💬",
+              title: "Tanya Jawab",
+              desc: "Tanya apa saja, dari pelajaran sampai hal sehari-hari.",
+              bg: "linear-gradient(135deg, #fef3e2, #fdf8f0)",
+            },
+            {
+              icon: "✍️",
+              title: "Bantu Menulis",
+              desc: "Buat caption, surat, artikel, atau ringkasan teks.",
+              bg: "linear-gradient(135deg, #f0f4e8, #f7faf2)",
+            },
+            {
+              icon: "🌐",
+              title: "Terjemah & Ide",
+              desc: "Terjemahkan bahasa atau cari ide kreatif.",
+              bg: "linear-gradient(135deg, #e8f0f8, #f2f6fc)",
+            },
           ].map((f) => (
             <div
               key={f.title}
-              className={`rounded-2xl border border-[#e8dcc4] bg-gradient-to-br ${f.color} p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200`}
+              className="p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+              style={{
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border)",
+                background: f.bg,
+                transitionTimingFunction: "var(--ease-out-expo)",
+              }}
             >
               <div className="text-4xl mb-3">{f.icon}</div>
-              <h3 className="font-semibold text-lg mb-2 text-[#2e2a23]">{f.title}</h3>
-              <p className="text-sm text-[#6b6353] leading-relaxed">{f.desc}</p>
+              <h3
+                className="text-lg mb-2"
+                style={{ fontFamily: "var(--font-display)", fontWeight: 600, color: "var(--ink)" }}
+              >
+                {f.title}
+              </h3>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--ink-secondary)" }}>
+                {f.desc}
+              </p>
             </div>
           ))}
         </div>
@@ -92,7 +153,10 @@ export default function Home() {
 
       {/* TIGA MODE */}
       <section className="px-6 py-12 max-w-3xl mx-auto">
-        <h2 className="text-xl font-bold text-center mb-8 text-[#2e2a23]">
+        <h2
+          className="text-xl font-bold text-center mb-8"
+          style={{ fontFamily: "var(--font-display)", color: "var(--ink)" }}
+        >
           🎭 Pilih Gaya Bicara
         </h2>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -104,12 +168,13 @@ export default function Home() {
           ].map((p) => (
             <div
               key={p.name}
-              className="flex items-center gap-3 bg-white/60 border border-[#e8dcc4] rounded-2xl px-5 py-3 text-sm"
+              className="flex items-center gap-3 px-5 py-3 text-sm"
+              style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)" }}
             >
               <span className="text-xl">{p.emoji}</span>
               <div>
-                <p className="font-semibold text-[#2e2a23]">{p.name}</p>
-                <p className="text-xs text-[#8a7a55]">{p.desc}</p>
+                <p className="font-semibold" style={{ color: "var(--ink)" }}>{p.name}</p>
+                <p className="text-xs" style={{ color: "var(--ink-muted)" }}>{p.desc}</p>
               </div>
             </div>
           ))}
@@ -117,16 +182,18 @@ export default function Home() {
       </section>
 
       {/* FOOTER */}
-      <footer className="px-6 py-10 text-center text-sm text-[#a99a78] border-t border-[#e8dcc4] mt-8">
+      <footer className="px-6 py-10 text-center text-sm mt-8" style={{ borderTop: "1px solid var(--border)", color: "var(--ink-muted)" }}>
         <a
           href="https://www.tiktok.com/@insyirah694"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 hover:text-[#b8965a] transition font-medium"
+          className="inline-flex items-center gap-1.5 font-medium transition-colors duration-200 hover:opacity-80"
         >
           🎵 Ikuti di TikTok @insyirah694
         </a>
-        <p className="mt-3">A&apos;insyirah · Asisten AI · {new Date().getFullYear()}</p>
+        <p className="mt-3">
+          A&apos;insyirah · Asisten AI · {new Date().getFullYear()}
+        </p>
       </footer>
     </main>
   );

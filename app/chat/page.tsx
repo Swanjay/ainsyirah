@@ -260,7 +260,7 @@ export default function ChatPage() {
       {/* HEADER */}
       <header className="flex items-center gap-3 px-5 py-4 border-b border-[#e8dcc4] bg-[#f6efe1]">
         <Link href="/" className="text-[#a99a78] hover:text-[#7a6c4d] text-sm">← Kembali</Link>
-        <div className="flex items-center gap-2 font-semibold ml-2 text-[#2e2a23]">
+        <div className="flex items-center gap-2 ml-2 text-[#2e2a23]" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.125rem" }}>
           <span className="text-xl">🌙</span> A&apos;insyirah
         </div>
         <button
@@ -308,9 +308,9 @@ export default function ChatPage() {
           <div className="flex justify-start">
             <div className="bg-white border border-[#ece2cf] rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-[#a99a78]">
               <span className="inline-flex gap-1">
-                <span className="animate-bounce">●</span>
-                <span className="animate-bounce [animation-delay:0.15s]">●</span>
-                <span className="animate-bounce [animation-delay:0.3s]">●</span>
+                <span className="animate-pulse [animation-timing-function:cubic-bezier(0.16,1,0.3,1)]">●</span>
+                <span className="animate-pulse [animation-delay:0.2s] [animation-timing-function:cubic-bezier(0.16,1,0.3,1)]">●</span>
+                <span className="animate-pulse [animation-delay:0.4s] [animation-timing-function:cubic-bezier(0.16,1,0.3,1)]">●</span>
               </span>
             </div>
           </div>
