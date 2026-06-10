@@ -54,8 +54,10 @@ function toGroqModel(modelKey: string): string {
   const map: Record<string, string> = {
     "groq/llama-3.1-8b": "llama-3.1-8b-instant",
     "groq/llama-3.3-70b": "llama-3.3-70b-versatile",
-    "groq/mixtral-8x7b": "mixtral-8x7b-32768",
-    "groq/gemma2-9b": "gemma2-9b-it",
+    "groq/qwen3-32b": "qwen/qwen3-32b",
+    "groq/gpt-oss-120b": "openai/gpt-oss-120b",
+    "groq/llama-4-scout": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "groq/gpt-oss-20b": "openai/gpt-oss-20b",
   };
   return map[modelKey] ?? "llama-3.1-8b-instant";
 }

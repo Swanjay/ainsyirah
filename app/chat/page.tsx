@@ -10,8 +10,10 @@ type Message = { role: "user" | "assistant"; content: string };
 const MODELS = [
   { key: "groq/llama-3.1-8b", label: "⚡ Llama 3.1 8B — Cepat & Ringan", default: true },
   { key: "groq/llama-3.3-70b", label: "🧠 Llama 3.3 70B — Terbaik & Pintar" },
-  { key: "groq/mixtral-8x7b", label: "🔮 Mixtral 8x7B — Seimbang" },
-  { key: "groq/gemma2-9b", label: "✨ Gemma 2 9B — Google AI" },
+  { key: "groq/qwen3-32b", label: "🔮 Qwen3 32B — Coding & Logika" },
+  { key: "groq/gpt-oss-120b", label: "✨ GPT-OSS 120B — OpenAI Open Source" },
+  { key: "groq/llama-4-scout", label: "🚀 Llama 4 Scout 17B — Terbaru Meta" },
+  { key: "groq/gpt-oss-20b", label: "💫 GPT-OSS 20B — Ringan & Cepat" },
 ];
 
 const GREETING: Message = {
