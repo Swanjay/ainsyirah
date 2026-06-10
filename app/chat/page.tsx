@@ -8,12 +8,20 @@ import VoiceInput from "../components/VoiceInput";
 type Message = { role: "user" | "assistant"; content: string };
 
 const MODELS = [
+  // ⚡ Groq — super cepat
   { key: "groq/llama-3.1-8b", label: "⚡ Llama 3.1 8B — Cepat & Ringan", default: true },
   { key: "groq/llama-3.3-70b", label: "🧠 Llama 3.3 70B — Terbaik & Pintar" },
   { key: "groq/qwen3-32b", label: "🔮 Qwen3 32B — Coding & Logika" },
   { key: "groq/gpt-oss-120b", label: "✨ GPT-OSS 120B — OpenAI Open Source" },
   { key: "groq/llama-4-scout", label: "🚀 Llama 4 Scout 17B — Terbaru Meta" },
   { key: "groq/gpt-oss-20b", label: "💫 GPT-OSS 20B — Ringan & Cepat" },
+  // 🆓 OpenRouter — model besar gratis
+  { key: "or/hermes-405b", label: "🌟 Hermes 3 405B — Terpintar (OpenRouter)" },
+  { key: "or/qwen3-coder", label: "🛠️ Qwen3 Coder 480B — Coding Terbaik (OpenRouter)" },
+  { key: "or/kimi-k2.6", label: "🌙 Kimi K2.6 — MoonshotAI (OpenRouter)" },
+  { key: "or/nemotron-ultra", label: "💎 Nemotron Ultra 550B — NVIDIA (OpenRouter)" },
+  { key: "or/gemma-4-31b", label: "🌈 Gemma 4 31B — Google (OpenRouter)" },
+  { key: "or/llama-3.3-70b", label: "🦙 Llama 3.3 70B — Meta (OpenRouter)" },
 ];
 
 const GREETING: Message = {

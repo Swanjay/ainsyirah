@@ -1,7 +1,7 @@
 // Backend A'insyirah — menghubungkan chat ke API AI.
 // Provider 1: Groq (primary, fast, free tier)
-// Provider 2: Pollinations (backup, free, no key)
-// Provider 3: Alpakyros (backup, needs key)
+// Provider 2: OpenRouter (secondary, 27+ free models)
+// Provider 3: Pollinations (backup, free, no key)
 
 export const runtime = "nodejs";
 
@@ -12,16 +12,16 @@ import { join } from "path";
 
 // API keys: prioritas ENV variable (Vercel), fallback ke file lokal
 let _groqKey = process.env.GROQ_API_KEY ?? "";
-let _alpakyrosKey = process.env.ALPAYKROS_KEY ?? "";
+let _openrouterKey = process.env.OPENROUTER_API_KEY ?? "";
 
-if (!_groqKey || !_alpakyrosKey) {
+if (!_groqKey || !_openrouterKey) {
   try {
     const envContent = readFileSync(join(process.cwd(), ".env.local"), "utf-8");
     for (const line of envContent.split("\n")) {
       const [k, ...v] = line.split("=");
       const val = v.join("=").trim();
       if (k?.trim() === "GROQ_API_KEY" && !_groqKey) _groqKey = val;
-      if (k?.trim() === "ALPAYKROS_KEY" && !_alpakyrosKey) _alpakyrosKey = val;
+      if (k?.trim() === "OPENROUTER_API_KEY" && !_openrouterKey) _openrouterKey = val;
     }
   } catch {}
 }
@@ -60,6 +60,24 @@ function toGroqModel(modelKey: string): string {
     "groq/gpt-oss-20b": "openai/gpt-oss-20b",
   };
   return map[modelKey] ?? "llama-3.1-8b-instant";
+}
+
+// Map model frontend → OpenRouter model name
+function toOpenRouterModel(modelKey: string): string {
+  const map: Record<string, string> = {
+    "or/hermes-405b": "nousresearch/hermes-3-llama-3.1-405b:free",
+    "or/qwen3-coder": "qwen/qwen3-coder:free",
+    "or/kimi-k2.6": "moonshotai/kimi-k2.6:free",
+    "or/nemotron-ultra": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "or/gemma-4-31b": "google/gemma-4-31b-it:free",
+    "or/llama-3.3-70b": "meta-llama/llama-3.3-70b-instruct:free",
+  };
+  return map[modelKey] ?? "nousresearch/hermes-3-llama-3.1-405b:free";
+}
+
+// Check if model is OpenRouter
+function isOpenRouterModel(modelKey: string): boolean {
+  return modelKey.startsWith("or/");
 }
 
 // === PROVIDER 1: Groq (primary) ===
@@ -101,7 +119,48 @@ async function askGroq(
   return null;
 }
 
-// === PROVIDER 2: Pollinations (backup, free, no key) ===
+// === PROVIDER 2: OpenRouter (free models) ===
+async function askOpenRouter(
+  messages: ChatMessage[],
+  systemPrompt: ChatMessage,
+  modelKey: string,
+): Promise<string | null> {
+  if (!_openrouterKey) return null;
+  const model = toOpenRouterModel(modelKey);
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${_openrouterKey}`,
+        "HTTP-Referer": "https://ainsyirah.vercel.app",
+        "X-Title": "A'insyirah AI",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [systemPrompt, ...messages],
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const reply = data?.choices?.[0]?.message?.content;
+      if (reply) {
+        console.log(`OK via OpenRouter/${model}`);
+        return reply;
+      }
+    } else {
+      const errText = await res.text().catch(() => "");
+      console.error(`OpenRouter error: ${res.status} ${errText.slice(0, 150)}`);
+    }
+  } catch (err) {
+    console.error(`OpenRouter failed:`, err);
+  }
+  return null;
+}
+
+// === PROVIDER 3: Pollinations (backup, free, no key) ===
 async function askPollinations(
   messages: ChatMessage[],
   systemPrompt: ChatMessage,
@@ -129,56 +188,34 @@ async function askPollinations(
   return null;
 }
 
-// === PROVIDER 3: Alpakyros (backup) ===
-async function askAlpakyros(
-  messages: ChatMessage[],
-  systemPrompt: ChatMessage,
-  modelKey: string,
-): Promise<string | null> {
-  if (!_alpakyrosKey) return null;
-  try {
-    const res = await fetch("https://api.alpakyros.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${_alpakyrosKey}`,
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        model: modelKey,
-        messages: [systemPrompt, ...messages],
-        stream: false,
-      }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const reply = data?.choices?.[0]?.message?.content;
-      if (reply) return reply;
-    }
-  } catch {}
-  return null;
-}
-
-// Main: Groq → Pollinations → Alpakyros
+// Main: Groq → OpenRouter (if or/ model) → Pollinations
 async function askAI(messages: ChatMessage[], persona: string, chosenModel?: string): Promise<string | null> {
   const systemPrompt: ChatMessage = {
     role: "system",
     content: PERSONAS[persona] ?? PERSONAS.umum,
   };
-  const model = chosenModel ?? "kr/deepseek-3.2";
+  const model = chosenModel ?? "groq/llama-3.1-8b";
 
-  // 1) Groq (primary — fast, reliable)
-  const groqResult = await askGroq(messages, systemPrompt, model);
-  if (groqResult) return groqResult;
+  // If user chose an OpenRouter model, try that first
+  if (isOpenRouterModel(model)) {
+    const orResult = await askOpenRouter(messages, systemPrompt, model);
+    if (orResult) return orResult;
+    // fallback to Groq
+    const groqResult = await askGroq(messages, systemPrompt, "groq/llama-3.1-8b");
+    if (groqResult) return groqResult;
+  } else {
+    // 1) Groq (primary — fast, reliable)
+    const groqResult = await askGroq(messages, systemPrompt, model);
+    if (groqResult) return groqResult;
 
-  // 2) Pollinations (backup — free, no key)
+    // 2) OpenRouter (fallback)
+    const orResult = await askOpenRouter(messages, systemPrompt, "or/hermes-405b");
+    if (orResult) return orResult;
+  }
+
+  // 3) Pollinations (backup — free, no key)
   const pollResult = await askPollinations(messages, systemPrompt);
   if (pollResult) return pollResult;
-
-  // 3) Alpakyros (backup — needs key)
-  const alpaResult = await askAlpakyros(messages, systemPrompt, model);
-  if (alpaResult) return alpaResult;
 
   return null;
 }
