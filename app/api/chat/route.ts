@@ -2,6 +2,7 @@
 // Provider 1: Groq (primary, fast, free tier)
 // Provider 2: OpenRouter (secondary, 27+ free models)
 // Provider 3: Pollinations (backup, free, no key)
+// Provider 4: Dahono Labs (20 free models, via relay)
 
 export const runtime = "nodejs";
 
@@ -78,6 +79,28 @@ function toOpenRouterModel(modelKey: string): string {
 // Check if model is OpenRouter
 function isOpenRouterModel(modelKey: string): boolean {
   return modelKey.startsWith("or/");
+}
+
+// Check if model is Dahono Labs
+function isDahonoModel(modelKey: string): boolean {
+  return modelKey.startsWith("dh/");
+}
+
+// Map model frontend → Dahono Labs model name
+function toDahonoModel(modelKey: string): string {
+  const map: Record<string, string> = {
+    "dh/qwen-max": "dahono/qwen-max",
+    "dh/qwen3.5-omni-flash": "dahono/qwen3.5-omni-flash",
+    "dh/qwen-plus": "dahono/qwen-plus",
+    "dh/qwen3-coder-flash": "dahono/qwen3-coder-flash",
+    "dh/qwen3.7-max": "dahono/qwen3.7-max",
+    "dh/glm-5.1": "dahono/glm-5.1",
+    "dh/deepseek-v4-flash": "dahono/deepseek-v4-flash",
+    "dh/deepseek-v4-pro": "dahono/deepseek-v4-pro",
+    "dh/qwen3-coder-plus": "dahono/qwen3-coder-plus",
+    "dh/qwen-flash": "dahono/qwen-flash",
+  };
+  return map[modelKey] ?? "dahono/qwen-max";
 }
 
 // === PROVIDER 1: Groq (primary) ===
@@ -188,7 +211,42 @@ async function askPollinations(
   return null;
 }
 
-// Main: Groq → OpenRouter (if or/ model) → Pollinations
+// === PROVIDER 4: Dahono Labs (free, via relay) ===
+async function askDahono(
+  messages: ChatMessage[],
+  systemPrompt: ChatMessage,
+  modelKey: string,
+): Promise<string | null> {
+  const model = toDahonoModel(modelKey);
+  try {
+    const res = await fetch("http://127.0.0.1:18082/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [systemPrompt, ...messages],
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const reply = data?.choices?.[0]?.message?.content;
+      if (reply) {
+        console.log(`OK via Dahono/${model}`);
+        return reply;
+      }
+    } else {
+      const errText = await res.text().catch(() => "");
+      console.error(`Dahono error: ${res.status} ${errText.slice(0, 150)}`);
+    }
+  } catch (err) {
+    console.error(`Dahono failed:`, err);
+  }
+  return null;
+}
+
+// Main: Groq → OpenRouter (if or/ model) → Dahono → Pollinations
 async function askAI(messages: ChatMessage[], persona: string, chosenModel?: string): Promise<string | null> {
   const systemPrompt: ChatMessage = {
     role: "system",
@@ -203,6 +261,13 @@ async function askAI(messages: ChatMessage[], persona: string, chosenModel?: str
     // fallback to Groq
     const groqResult = await askGroq(messages, systemPrompt, "groq/llama-3.1-8b");
     if (groqResult) return groqResult;
+  } else if (isDahonoModel(model)) {
+    // If user chose a Dahono model, try that first
+    const dahonoResult = await askDahono(messages, systemPrompt, model);
+    if (dahonoResult) return dahonoResult;
+    // fallback to Groq
+    const groqResult = await askGroq(messages, systemPrompt, "groq/llama-3.1-8b");
+    if (groqResult) return groqResult;
   } else {
     // 1) Groq (primary — fast, reliable)
     const groqResult = await askGroq(messages, systemPrompt, model);
@@ -213,7 +278,11 @@ async function askAI(messages: ChatMessage[], persona: string, chosenModel?: str
     if (orResult) return orResult;
   }
 
-  // 3) Pollinations (backup — free, no key)
+  // 3) Dahono Labs (free, via relay)
+  const dahonoResult = await askDahono(messages, systemPrompt, "dh/qwen-max");
+  if (dahonoResult) return dahonoResult;
+
+  // 4) Pollinations (backup — free, no key)
   const pollResult = await askPollinations(messages, systemPrompt);
   if (pollResult) return pollResult;
 
