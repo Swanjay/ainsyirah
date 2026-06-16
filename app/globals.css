@@ -173,10 +173,11 @@
    Global Styles
    ============================================ */
 
-* {
+a, button, select, input, textarea {
   transition: background-color var(--duration-normal) var(--ease-out-expo),
               border-color var(--duration-normal) var(--ease-out-expo),
-              color var(--duration-normal) var(--ease-out-expo);
+              color var(--duration-normal) var(--ease-out-expo),
+              opacity var(--duration-fast) var(--ease-out-expo);
 }
 
 body {

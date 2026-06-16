@@ -8,24 +8,10 @@ export const runtime = "nodejs";
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
-import { readFileSync } from "fs";
-import { join } from "path";
-
-// API keys: prioritas ENV variable (Vercel), fallback ke file lokal
-let _groqKey = process.env.GROQ_API_KEY ?? "";
-let _openrouterKey = process.env.OPENROUTER_API_KEY ?? "";
-
-if (!_groqKey || !_openrouterKey) {
-  try {
-    const envContent = readFileSync(join(process.cwd(), ".env.local"), "utf-8");
-    for (const line of envContent.split("\n")) {
-      const [k, ...v] = line.split("=");
-      const val = v.join("=").trim();
-      if (k?.trim() === "GROQ_API_KEY" && !_groqKey) _groqKey = val;
-      if (k?.trim() === "OPENROUTER_API_KEY" && !_openrouterKey) _openrouterKey = val;
-    }
-  } catch {}
-}
+// API keys: cukup ENV variable (Vercel)
+const _groqKey = process.env.GROQ_API_KEY ?? "";
+const _openrouterKey = process.env.OPENROUTER_API_KEY ?? "";
+const isVercel = !!process.env.VERCEL;
 
 // Daftar "kepribadian" asisten
 const PERSONAS: Record<string, string> = {
@@ -49,6 +35,18 @@ const PERSONAS: Record<string, string> = {
     "kebenarannya, serta sebutkan sumbernya. Jika tidak yakin pada suatu dalil, katakan dengan jujur " +
     "dan sarankan merujuk pada ustadz/sumber terpercaya. Tetap ramah dan memberi semangat.",
 };
+
+// Valid model keys (backend validation)
+const VALID_MODELS = new Set([
+  "groq/llama-3.1-8b", "groq/llama-3.3-70b", "groq/qwen3-32b",
+  "groq/gpt-oss-120b", "groq/llama-4-scout", "groq/gpt-oss-20b",
+  "or/hermes-405b", "or/qwen3-coder", "or/kimi-k2.6",
+  "or/nemotron-ultra", "or/gemma-4-31b", "or/llama-3.3-70b",
+  "dh/qwen-max", "dh/qwen3.5-omni-flash", "dh/qwen-plus",
+  "dh/qwen3-coder-flash", "dh/qwen3.7-max", "dh/glm-5.1",
+  "dh/deepseek-v4-flash", "dh/deepseek-v4-pro", "dh/qwen3-coder-plus",
+  "dh/qwen-flash",
+]);
 
 // Map model frontend → Groq model name
 function toGroqModel(modelKey: string): string {
@@ -211,12 +209,15 @@ async function askPollinations(
   return null;
 }
 
-// === PROVIDER 4: Dahono Labs (free, via relay) ===
+// === PROVIDER 4: Dahono Labs (free, via relay — LOCAL ONLY) ===
 async function askDahono(
   messages: ChatMessage[],
   systemPrompt: ChatMessage,
   modelKey: string,
 ): Promise<string | null> {
+  // Dahono relay cuma jalan di local, skip di Vercel production
+  if (isVercel) return null;
+
   const model = toDahonoModel(modelKey);
   try {
     const res = await fetch("http://127.0.0.1:18082/v1/chat/completions", {
@@ -278,7 +279,7 @@ async function askAI(messages: ChatMessage[], persona: string, chosenModel?: str
     if (orResult) return orResult;
   }
 
-  // 3) Dahono Labs (free, via relay)
+  // 3) Dahono Labs (free, via relay — local only)
   const dahonoResult = await askDahono(messages, systemPrompt, "dh/qwen-max");
   if (dahonoResult) return dahonoResult;
 
@@ -297,22 +298,23 @@ export async function POST(request: Request) {
       model?: string;
     };
 
-    const reply = await askAI(messages, mode ?? "umum", model);
+    // Validate model key
+    const safeModel = model && VALID_MODELS.has(model) ? model : undefined;
+
+    const reply = await askAI(messages, mode ?? "umum", safeModel);
 
     if (reply) {
       return Response.json({ reply, mode: "live" });
     }
 
-    const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
     return Response.json({
       reply:
-        "⚠️ Semua model AI sedang sibuk. Coba lagi dalam beberapa detik.\n\n" +
-        `Pertanyaanmu: "${lastUser}"`,
+        "⚠️ Semua model AI sedang sibuk. Coba lagi dalam beberapa detik.",
       mode: "demo",
     });
-  } catch (err) {
+  } catch {
     return Response.json(
-      { error: "Terjadi kesalahan di server.", detail: String(err) },
+      { error: "Terjadi kesalahan di server." },
       { status: 500 },
     );
   }

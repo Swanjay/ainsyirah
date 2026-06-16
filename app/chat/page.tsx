@@ -93,9 +93,14 @@ export default function ChatPage() {
     } catch {}
   }, []);
 
+  // Rate limit: 1 request per 3 detik
+  const lastSendRef = useRef(0);
+
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      // Simpan max 50 pesan terakhir
+      const toSave = messages.slice(-50);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     } catch {}
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
@@ -150,10 +155,25 @@ export default function ChatPage() {
     const text = inputText.trim();
     if (!text || loading) return;
 
+    // Rate limit: 1 request per 3 detik
+    const now = Date.now();
+    if (now - lastSendRef.current < 3000) return;
+    lastSendRef.current = now;
+
     const newMessages: Message[] = [...messages, { role: "user", content: text }];
     setMessages(newMessages);
     setInputText("");
     setLoading(true);
+
+    // Deteksi mode dari pilihan persona user (default: umum)
+    const modeMap: Record<string, string> = {
+      "fotosintesis": "belajar", "jelaskan": "belajar", "pelajaran": "belajar",
+      "caption": "nulis", "artikel": "nulis", "surat": "nulis",
+      "arab": "islami", "doa": "islami", "quran": "islami", "hadis": "islami",
+    };
+    const lowerText = text.toLowerCase();
+    const detectedMode = Object.keys(modeMap).find(k => lowerText.includes(k));
+    const apiMode = detectedMode ? modeMap[detectedMode] : "umum";
 
     try {
       const res = await fetch("/api/chat", {
@@ -162,6 +182,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           messages: newMessages,
           model: settings.model,
+          mode: apiMode,
           ...(settings.useCustom
             ? { customBaseUrl: settings.customBaseUrl, customApiKey: settings.customApiKey }
             : {}),

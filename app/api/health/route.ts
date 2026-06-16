@@ -31,7 +31,6 @@ export async function GET() {
 
   return Response.json({
     groq_key_set: !!groqKey,
-    groq_key_prefix: groqKey.slice(0, 8),
     groq_test: groqStatus,
     timestamp: new Date().toISOString(),
   });
